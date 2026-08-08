@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccessCodeStatus {
+  UNUSED
+  USED
+}
+
+enum RSVPSource {
+  ONLINE
+  MANUAL
+}
+
+enum CheckInStatus {
+  PENDING
+  CHECKED_IN
+}
+
+model Admin {
+  id            String   @id @default(uuid())
+  username      String   @unique
+  password_hash String
+
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+}
+
+model AccessCode {
+  id         String           @id @default(uuid())
+  code       String           @unique
+  status     AccessCodeStatus @default(UNUSED)
+
+  used_at    DateTime?
+
+  rsvp_id    String?          @unique
+  rsvp       RSVP?            @relation(fields: [rsvp_id], references: [id])
+
+  created_at DateTime         @default(now())
+  updated_at DateTime         @updatedAt
+
+  @@index([status])
+}
+
+model RSVP {
+  id               String          @id @default(uuid())
+
+  full_name        String
+  phone_number     String
+  email            String?
+
+  has_plus_one     Boolean         @default(false)
+  plus_one_name    String?
+
+  source           RSVPSource
+
+  qr_token         String          @unique @default(uuid())
+
+  check_in_status  CheckInStatus   @default(PENDING)
+  checked_in_at    DateTime?
+
+  access_code      AccessCode?
+
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+
+  @@index([full_name])
+  @@index([phone_number])
+  @@index([check_in_status])
+}

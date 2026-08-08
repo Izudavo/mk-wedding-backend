@@ -1,0 +1,17 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mk-wedding-rsvp-db
+    restart: unless-stopped
+    environment:
+    # Development-only root password.
+    # This will be replaced with a secure secret before production deployment.
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mk_wedding_rsvp
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
