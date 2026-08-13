@@ -23,53 +23,66 @@ enum CheckInStatus {
 }
 
 model Admin {
-  id            String   @id @default(uuid())
-  username      String   @unique
+  id            String @id @default(uuid())
+  username      String @unique
   password_hash String
 
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model AccessCode {
-  id         String           @id @default(uuid())
-  code       String           @unique
-  status     AccessCodeStatus @default(UNUSED)
+  id     String           @id @default(uuid())
+  code   String           @unique
+  status AccessCodeStatus @default(UNUSED)
 
-  used_at    DateTime?
+  used_at DateTime?
 
-  rsvp_id    String?          @unique
-  rsvp       RSVP?            @relation(fields: [rsvp_id], references: [id])
+  rsvp_id String? @unique
+  rsvp    RSVP?   @relation(fields: [rsvp_id], references: [id])
 
-  created_at DateTime         @default(now())
-  updated_at DateTime         @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   @@index([status])
 }
 
 model RSVP {
-  id               String          @id @default(uuid())
+  id String @id @default(uuid())
 
-  full_name        String
-  phone_number     String
-  email            String?
+  full_name    String
+  phone_number String
+  email        String?
 
-  has_plus_one     Boolean         @default(false)
-  plus_one_name    String?
+  has_plus_one  Boolean @default(false)
+  plus_one_name String?
 
-  source           RSVPSource
+  source RSVPSource
 
-  qr_token         String          @unique @default(uuid())
+  qr_token String @unique @default(uuid())
 
-  check_in_status  CheckInStatus   @default(PENDING)
-  checked_in_at    DateTime?
+  check_in_status CheckInStatus @default(PENDING)
+  checked_in_at   DateTime?
 
-  access_code      AccessCode?
+  access_code AccessCode?
 
-  created_at       DateTime        @default(now())
-  updated_at       DateTime        @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   @@index([full_name])
   @@index([phone_number])
   @@index([check_in_status])
+}
+
+model Letter {
+  id String @id @default(uuid())
+
+  author_name  String
+  relationship String?
+  message      String
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([created_at])
 }
