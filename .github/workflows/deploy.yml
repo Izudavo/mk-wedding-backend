@@ -40,20 +40,38 @@ jobs:
         run: |
           mkdir -p ~/.ssh
 
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
           chmod 600 ~/.ssh/ec2_key
 
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -T 10 -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Test SSH connection
+        run: |
+          ssh \
+            -i ~/.ssh/ec2_key \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}" \
+            "echo 'SSH connection successful'"
+
+      - name: Prepare EC2 directory
+        run: |
+          ssh \
+            -i ~/.ssh/ec2_key \
+            "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}" \
+            "mkdir -p ~/mk-wedding-rsvp"
 
       - name: Upload Docker image
         run: |
-          scp -i ~/.ssh/ec2_key \
+          scp \
+            -i ~/.ssh/ec2_key \
             rsvp-api.tar.gz \
             "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/tmp/rsvp-api.tar.gz"
 
       - name: Upload production Compose file
         run: |
-          scp -i ~/.ssh/ec2_key \
+          scp \
+            -i ~/.ssh/ec2_key \
             docker-compose.prod.yml \
             "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:~/mk-wedding-rsvp/docker-compose.prod.yml"
 
@@ -68,7 +86,8 @@ jobs:
           CHECK_IN_URL: ${{ secrets.CHECK_IN_URL }}
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         run: |
-          ssh -i ~/.ssh/ec2_key \
+          ssh \
+            -i ~/.ssh/ec2_key \
             "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}" \
             "NODE_ENV='${NODE_ENV}' \
              PORT='${PORT}' \
@@ -123,6 +142,7 @@ jobs:
 
             if [ "$i" -eq 30 ]; then
               echo "API failed health check."
+
               echo
               echo "Container status:"
               docker ps -a --filter "name=mk-wedding-rsvp-api"
