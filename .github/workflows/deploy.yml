@@ -1,0 +1,147 @@
+name: Deploy RSVP API
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          load: true
+          tags: mk-wedding-rsvp-api:latest
+
+      - name: Show image size
+        run: |
+          docker image ls mk-wedding-rsvp-api:latest
+
+      - name: Save and compress Docker image
+        run: |
+          docker save mk-wedding-rsvp-api:latest | gzip > rsvp-api.tar.gz
+
+      - name: Show compressed image size
+        run: |
+          ls -lh rsvp-api.tar.gz
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Upload Docker image
+        run: |
+          scp -i ~/.ssh/ec2_key \
+            rsvp-api.tar.gz \
+            "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/tmp/rsvp-api.tar.gz"
+
+      - name: Upload production Compose file
+        run: |
+          scp -i ~/.ssh/ec2_key \
+            docker-compose.prod.yml \
+            "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:~/mk-wedding-rsvp/docker-compose.prod.yml"
+
+      - name: Deploy to EC2
+        env:
+          NODE_ENV: ${{ secrets.NODE_ENV }}
+          PORT: ${{ secrets.PORT }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          CHECK_IN_URL: ${{ secrets.CHECK_IN_URL }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+        run: |
+          ssh -i ~/.ssh/ec2_key \
+            "${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}" \
+            "NODE_ENV='${NODE_ENV}' \
+             PORT='${PORT}' \
+             DATABASE_URL='${DATABASE_URL}' \
+             JWT_SECRET='${JWT_SECRET}' \
+             ADMIN_USERNAME='${ADMIN_USERNAME}' \
+             ADMIN_PASSWORD='${ADMIN_PASSWORD}' \
+             CHECK_IN_URL='${CHECK_IN_URL}' \
+             CORS_ORIGIN='${CORS_ORIGIN}' \
+             bash -s" << 'EOF'
+
+          set -e
+
+          APP_DIR="$HOME/mk-wedding-rsvp"
+
+          echo "Preparing application directory..."
+          mkdir -p "$APP_DIR"
+
+          cd "$APP_DIR"
+
+          echo "Creating production environment file..."
+
+          cat > .env << ENVEOF
+          NODE_ENV=${NODE_ENV}
+          PORT=${PORT}
+          DATABASE_URL=${DATABASE_URL}
+          JWT_SECRET=${JWT_SECRET}
+          ADMIN_USERNAME=${ADMIN_USERNAME}
+          ADMIN_PASSWORD=${ADMIN_PASSWORD}
+          CHECK_IN_URL=${CHECK_IN_URL}
+          CORS_ORIGIN=${CORS_ORIGIN}
+          ENVEOF
+
+          chmod 600 .env
+
+          echo "Loading Docker image..."
+          gunzip -c /tmp/rsvp-api.tar.gz | docker load
+
+          echo "Removing uploaded image archive..."
+          rm -f /tmp/rsvp-api.tar.gz
+
+          echo "Starting RSVP API..."
+          docker compose -f docker-compose.prod.yml up -d
+
+          echo "Waiting for API container..."
+
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:5000/health > /dev/null; then
+              echo "API is healthy!"
+              break
+            fi
+
+            if [ "$i" -eq 30 ]; then
+              echo "API failed health check."
+              echo
+              echo "Container status:"
+              docker ps -a --filter "name=mk-wedding-rsvp-api"
+
+              echo
+              echo "Container logs:"
+              docker logs --tail 100 mk-wedding-rsvp-api
+
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo
+          echo "Final container status:"
+          docker ps --filter "name=mk-wedding-rsvp-api"
+
+          echo
+          echo "Deployment successful!"
+
+          EOF
