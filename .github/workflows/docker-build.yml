@@ -30,7 +30,11 @@ jobs:
         run: |
           docker image ls mk-wedding-rsvp-api:test
 
-      - name: Inspect image
+      - name: Inspect image size
         run: |
           docker image inspect mk-wedding-rsvp-api:test \
             --format='Image size: {{.Size}} bytes'
+
+      - name: Inspect image layers
+        run: |
+          docker history mk-wedding-rsvp-api:test
