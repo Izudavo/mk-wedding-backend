@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: mk-wedding-rsvp-api
+
+    restart: unless-stopped
+
+    env_file:
+      - .env.docker-test
+
+    ports:
+      - "5000:5000"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

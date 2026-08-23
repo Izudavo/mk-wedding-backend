@@ -13,12 +13,13 @@ import { errorHandler } from "./common/errors/error-handler";
 import checkInApiRoutes from "./modules/check-in/check-in.api.routes";
 
 const app = express();
+const corsOrigin = process.env.CORS_ORIGIN || "*";
 
 app.use(helmet());
 
 app.use(
   cors({
-    origin: "*",
+    origin: corsOrigin,
     credentials: true,
   })
 );

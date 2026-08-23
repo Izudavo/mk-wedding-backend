@@ -1,0 +1,29 @@
+services:
+  api:
+    image: mk-wedding-rsvp-api:latest
+    container_name: mk-wedding-rsvp-api
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    ports:
+      - "127.0.0.1:5000:5000"
+
+    networks:
+      - mysql-server_default
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://127.0.0.1:5000/health || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  mysql-server_default:
+    external: true
